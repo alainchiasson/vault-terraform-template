@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# From : https://marco-urrea.medium.com/hashicorp-vault-aws-secrets-engine-3297bf3ffbd4
+#
+
+# Eanble AWS secrets.
+vault secrets enable -path=aws aws
+vault write aws/config/root access_key=$AWS_ACCESS_KEY_ID secret_key=$AWS_SECRET_ACCESS_KEY region=us-east-1
+vault write /aws/config/lease lease="30m" lease_max="12h"
+
+# Create AWS Role.
+vault write aws/roles/my-role credential_type=iam_user policy_document=-<<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Stmt1426528957000",
+      "Effect": "Allow",
+      "Action": [
+        "s3:*"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}
+EOF
+
+vault policy write aws-cred - << EOF
+
+path "aws/creds/my-role" {
+    capabilities = ["read", "create", "update"]
+}
+
+EOF
+
+vault auth enable userpass
+
+vault write auth/userpass/users/corpsec password=corpsec policies=aws-cred,default
+vault write auth/userpass/users/regular password=regular policies=default
+
+
